@@ -1,0 +1,130 @@
+{
+  "run_at": "2026-04-06T00:18:11.810385",
+  "duration_seconds": 274.0,
+  "article_count": 5,
+  "articles": [
+    {
+      "url": "https://blog.dfi.com/en/intelligent-video-at-the-edge-dfi-deepx-and-network-optix-power-scalable-ai-surveillance?hsLang=en",
+      "title": "Intelligent Video at the Edge: DFI, DEEPX, and Network Optix Power Scalable AI Surveillance",
+      "content": "DFI-logo\n\nTech in Days\n\nnav toggle button\nclose button\n\nsearch icon\nclose button\nclose button\nDFI Insight_DFI-DEEPX-Nx Cooperation Article_官網縮圖_1600x900px\n\n# Intelligent Video at the Edge: DFI, DEEPX, and Network Optix Power Scalable AI Surveillance\n\n### Meet the Edge AI Ecosystem: Hardware, Acceleration, and Orchestration in Sync\n\n As cities grow more connected, intelligent video surveillance has become essential for public safety, real-time situational awareness, and infrastructure resilience. According to Mordor Intelligence, the city surveillance market is projected to grow from USD 14.40 billion in 2025 to USD 21.65 billion by 2030, with a CAGR of 8.5%. This growth is fueled by increasing investment in AI, edge computing, and real-time video analytics. [...] Deploying smart surveillance in modern urban and industrial environments is more than just about placing more cameras—it also covers delivering real-time, reliable, and scalable intelligence at the edge. From bandwidth limitations to harsh outdoor conditions, organizations face four critical challenges that can make or break deployment success:\n\nReal-time analytics require ultra-low latency. Cloud-based systems often introduce delays and consume high bandwidth, undermining timely decision-making and raising privacy concerns.\n\nIn smart surveillance settings, the Edge AI model will be deployed to a fragmented landscape of devices and frameworks. Integrating AI models across diverse hardware slows deployment and adds engineering complexity. [...] DFI Insight_DFI-DEEPX-Nx Cooperation Article_內文圖片1\n\nDFI Insight_DFI-DEEPX-Nx Cooperation Article_內文圖片1\n\n## DFI: Future-Ready Edge AI Lineup\n\nDFI’s industrial-grade platforms power reliable edge AI for intelligent video, surveillance, and infrastructure in harsh environments. From compact fanless PCs and AI systems to SoMs and edge servers, DFI delivers flexibility, ruggedness, and long-term performance.\n\nOne of the standouts is the EC700-ASL, a rugged, fanless system powered by Intel® Amston Lake. With support for -40 to 60°C operations, Out-of-Band (OOB) management, Intel® TCC, and M.2 AI accelerator integration, it is ideal for mission-critical edge intelligent applications.",
+      "source": "web",
+      "score_relevance": 9,
+      "score_technical": 6,
+      "score_compelling": 7,
+      "category": "Marketplace_News",
+      "summary": "DFI, DEEPX, and Network Optix collaborate on edge AI ecosystem for scalable surveillance, addressing latency, bandwidth, and hardware fragmentation challenges. DFI's EC700-ASL fanless system features Intel Amston Lake, -40°C to 60°C operation, OOB management, and M.2 AI accelerator slots for DEEPX integration. Network Optix provides VMS orchestration for multi-device AI model deployment in urban/industrial settings.",
+      "takeaways": [
+        "Rugged edge hardware with AI accel support enables real-time analytics in harsh environments, reducing cloud dependency",
+        "Ecosystem syncs hardware (DFI), acceleration (DEEPX), and software (Nx Witness) for simplified integration and scalability",
+        "Strategic for MSPs/VSaaS: tackles deployment complexities like diverse hardware and low-latency requirements"
+      ],
+      "entities": [
+        "DFI",
+        "DEEPX",
+        "Network Optix",
+        "Intel Amston Lake",
+        "EC700-ASL",
+        "Nx Witness"
+      ],
+      "why_keep": "Concrete edge hardware specs and ecosystem integration for scalable IVS deployments, valuable for integrators/MSPs evaluating TCO and edge/cloud tradeoffs"
+    },
+    {
+      "url": "https://www.linkedin.com/posts/meeshaim-manzoor-a72404252_real-time-situation-monitoring-system-ai-powered-activity-7437871945972473856-Pcjj",
+      "title": "AI-Powered Computer Vision for Real-Time Situation ...",
+      "content": "In outdoor environments for safety, surveillance and autonomy, camera motion is inevitable — vibration, wind, or mechanical shake all impact visual clarity. Addressing this with image stabilization is not just about aesthetics - it directly improves detection accuracy, tracking stability, and operator awareness.\nHowever, it isn't realistic to always have a mechanical gimbal, external IMU or gyroscope to measure and compensate for these perturbations. At Orella Vision, we address this with our visual-only approach for electronic image stabilization, designed to work in a variety of dynamic environments for horizontal, vertical and rotational correction, optimized for real-time usage on edge AI embedded systems. [...] Real-Time Situation Monitoring System – AI-Powered Computer Vision\nI developed a real-time computer vision system that continuously observes and analyzes its surroundings to detect and monitor situations as they happen. The system processes live visual input from a camera and uses AI-driven vision techniques to understand activities in the environment.\nInstead of simply capturing video, the system interprets what it sees—identifying changes, tracking movement, and providing intelligent monitoring in real time. This allows the system to function as a smart visual observer capable of assisting with awareness and automated surveillance tasks.\nKey Features\n• Real-time video processing through computer vision\n• AI-based environment monitoring\n• Motion and activity detection [...] 4S Security and Quanergy Solutions Inc. have partnered to deliver a new approach to modern security operations.\nBy combining 3D LiDAR-based spatial sensing with automation workflows, organizations can move beyond passive monitoring to real-time awareness and automated response.\nQuanergy’s Q-TRACK™ provides precise, privacy-safe detection and tracking, while 4S Security enables intelligent workflow automation across video, access control, and building systems.\nKey Platform Capabilities\n• Real-Time Floor Plan Visualization of detected objects and movement\n• Zone-Level Occupancy Monitoring with configurable thresholds\n• Dwell Time Analytics to identify loitering and congestion\n• Behavioral Anomaly Detection, including running and man-down events",
+      "source": "web",
+      "score_relevance": 9,
+      "score_technical": 7,
+      "score_compelling": 8,
+      "category": "CV_Technique",
+      "summary": "Orella Vision's visual-only electronic image stabilization enables real-time horizontal/vertical/rotational correction on edge AI systems without gimbals/IMUs, boosting detection accuracy and tracking in dynamic outdoor surveillance. Quanergy's Q-TRACK 3D LiDAR integrates with 4S Security for privacy-safe spatial sensing, offering real-time floor plan visualization, zone occupancy, dwell time analytics, and anomaly detection (e.g., running, man-down) fused with video/access control workflows. Highlights edge optimizations, sensor fusion, and PhySec automation for scalable VSaaS deployments.",
+      "takeaways": [
+        "Visual-only EIS optimizes edge AI for vibration-prone cameras, improving CV accuracy without hardware dependencies.",
+        "LiDAR+video fusion enables precise, privacy-preserving behavioral analytics and automated responses in multi-system security platforms."
+      ],
+      "entities": [
+        "Orella Vision",
+        "Quanergy Solutions",
+        "Q-TRACK",
+        "4S Security",
+        "3D LiDAR",
+        "Electronic Image Stabilization"
+      ],
+      "why_keep": "Delivers edge AI stabilization techniques and LiDAR sensor fusion details with direct IVS deployment value for real-time surveillance and MSP integrations."
+    },
+    {
+      "url": "https://www.sciencedirect.com/science/article/abs/pii/S0923596526000767",
+      "title": "Highly Efficient Anomaly Detection in Traffic Surveillance ...",
+      "content": "### Future Generation Computer Systems\n\n### Vision transformer attention with multi-reservoir echo state network for anomaly recognition\n\n### Information Processing & Management\n\n### Detection of anomaly in surveillance videos using quantum convolutional neural networks\n\n### Image and Vision Computing\n\n### Attention-based anomaly detection in multi-view surveillance videos\n\n### Knowledge-Based Systems\n\n### A real time crime scene intelligent video surveillance systems in violence detection framework using deep learning techniques\n\n### Computers and Electrical Engineering\n\n### Edge computing enabled video segmentation for real-time traffic monitoring in internet of vehicles\n\n### Pattern Recognition [...] ### Pattern Recognition\n\n### Decoupled appearance and motion learning for efficient anomaly detection in surveillance video\n\n### Computer Vision and Image Understanding\n\n### A semi-supervised deep learning based video anomaly detection framework using RGB-D for surveillance of real-world critical environments\n\n### Forensic Science International: Digital Investigation\n\n### Video anomaly detection system using deep convolutional and recurrent models\n\n### Results in Engineering\n\n### Deep learning based detection and localization of road accidents from traffic surveillance videos\n\n### ICT Express\n\n### An automated deep learning based anomaly detection in pedestrian walkways for vulnerable road users safety\n\n### Safety science",
+      "source": "web",
+      "score_relevance": 9,
+      "score_technical": 8,
+      "score_compelling": 8,
+      "category": "CV_Technique",
+      "summary": "Collection of recent peer-reviewed papers on advanced anomaly detection in surveillance videos, featuring techniques like vision transformers with echo state networks, quantum CNNs, attention mechanisms for multi-view videos, decoupled appearance/motion learning, and edge-enabled segmentation for traffic monitoring. Methods target real-time processing, RGB-D semi-supervised frameworks, and deep recurrent models for crime/accident detection in critical environments. Emphasizes efficiency for edge deployment and integration with IoT vehicles/pedestrian safety.",
+      "takeaways": [
+        "Novel hybrids like ViT + reservoir networks and quantum CNNs push anomaly recognition boundaries in surveillance.",
+        "Edge computing and decoupled learning enable real-time traffic/pedestrian anomaly detection with measurable efficiency gains.",
+        "Semi-supervised RGB-D and multi-view attention address real-world deployment challenges in critical infra."
+      ],
+      "entities": [
+        "Vision Transformer",
+        "Quantum CNN",
+        "Echo State Network",
+        "Attention Mechanisms",
+        "RGB-D",
+        "Edge Computing",
+        "Pattern Recognition",
+        "Computer Vision and Image Understanding"
+      ],
+      "why_keep": "Primary academic papers detailing cutting-edge CV algorithms for real-time IVS anomaly detection with edge optimizations and benchmarks."
+    },
+    {
+      "url": "https://www.marchnetworks.com/news/behind-the-lens-february-2026/",
+      "title": "Behind the Lens - February 2026 - March Networks",
+      "content": "## March 11-12, 2026 | Toronto | Canada\n\n## RLPSA\n\n## March 22-24, 2026 | Dallas | USA\n\n## ISC West\n\n## March 25-27, 2026 | Las Vegas | USA\n\n## Retail Technology Show (RTS)\n\n## April 22-23, 2026 | London | UK\n\n## The Security Event\n\n## April 28-30, 2026 | Birmingham | UK\n\n## Please visit the [Partner Portal for all technical updates.](\n\nNote: Please ensure you’re logged in to the Partner Portal to view these updates.\n\n### New Updates Now Available on the Partner Portal\n\n## Related Articles\n\n## March Networks Wins 2026 SIA Award for Cloud Storage Innovation at ISC West 2026\n\n## Behind the Lens – March 2026\n\n## March Networks Transforms Video Surveillance with Generative AI on AWS (Amazon Web Services)\n\n### Make Your Move to Intelligent Video [...] In his latest blog post, Owais Khalid, Product Manager for Enterprise Management, recaps our Intersec Dubai 2026 product launch, highlighting the global availability of March Networks Long Term Cloud Storage and its ability to reduce long-term video retention costs by up to 80% over five years. He shares how our hybrid approach, combining on-prem access for recent footage with Amazon S3 Glacier for archival storage, gives customers greater flexibility and scalability.\n\nHe also outlines key enhancements across AI Smart Search, Attribute Search, Command, and new edge devices, showcasing how the full release brings smarter search, flexible storage, and scalable video intelligence together.\n\n## Interview: March Networks Highlights AI Innovation at Intersec Dubai 2026",
+      "source": "web",
+      "score_relevance": 8,
+      "score_technical": 6,
+      "score_compelling": 7,
+      "category": "Marketplace_News",
+      "summary": "March Networks launched globally available Long Term Cloud Storage with hybrid on-prem recent footage access and AWS S3 Glacier archival, claiming up to 80% cost reduction over five years for scalable VSaaS retention. Enhancements span AI Smart Search, Attribute Search, Command platform, and new edge devices, integrating generative AI on AWS for smarter, flexible video intelligence. SIA 2026 award highlights cloud storage innovation amid Intersec Dubai launch.",
+      "takeaways": [
+        "Hybrid storage architecture balances accessibility, scalability, and TCO via on-prem/AWS S3 Glacier",
+        "AI search and edge device upgrades enable advanced analytics in multi-tenant MSP workflows",
+        "Generative AI on AWS drives convergence of video intel with cloud-native scalability"
+      ],
+      "entities": [
+        "March Networks",
+        "AWS",
+        "S3 Glacier",
+        "AI Smart Search",
+        "Attribute Search"
+      ],
+      "why_keep": "Concrete VSaaS TCO metrics, hybrid arch tradeoffs, and AI platform enhancements with MSP scalability value"
+    },
+    {
+      "url": "https://arxiv.org/html/2603.25411v1",
+      "title": "​​HiSpatial: Taming Hierarchical 3D Spatial Understanding in Vision ...",
+      "content": "valuable insights for future training strategies to advance VLMs’ spatial intelligence. [...] #### VLMs with auxiliary 3D information. [...] We proposed a hierarchical framework organizing 3D spatial intelligence into a four-level taxonomy, progressively from basic geometric perception to complex abstract reasoning. Based on this framework, we build an automated pipeline and a large-scale dataset of diverse spatial VQA pairs from in-the-wild images and 3D-annotated data, enabling VLMs to learn comprehensive spatial understanding and reasoning via supervised fine-tuning. We also introduce an RGB-D VLM that incorporates metric-scale 3D point maps to enhance spatial understanding. Extensive experiments have demonstrated our state-of-the-art performance across diverse spatial benchmarks. Furthermore, our analysis highlighted clear inter-level dependencies among tasks, providing valuable insights for future training strategies to",
+      "source": "web",
+      "score_relevance": 9,
+      "score_technical": 9,
+      "score_compelling": 9,
+      "category": "CV_Technique",
+      "summary": "HiSpatial introduces a hierarchical four-level taxonomy for 3D spatial intelligence in VLMs, from geometric perception to abstract reasoning, with an automated pipeline generating a large-scale spatial VQA dataset from in-the-wild images and 3D annotations for supervised fine-tuning. It proposes an RGB-D VLM integrating metric-scale 3D point maps, achieving SOTA on spatial benchmarks and revealing inter-level task dependencies for optimized training. Offers strategic value for IVS by enhancing real-time 3D scene understanding, object tracking, and anomaly detection in surveillance deployments.",
+      "takeaways": [
+        "Hierarchical 3D spatial taxonomy enables progressive VLM training, with dataset pipeline supporting scalable fine-tuning on diverse real-world imagery.",
+        "RGB-D VLM with 3D point maps boosts metric accuracy; inter-level dependencies guide efficient architectures for edge/cloud IVS inference."
+      ],
+      "entities": [
+        "HiSpatial",
+        "VLMs",
+        "RGB-D VLM",
+        "3D point maps",
+        "spatial VQA"
+      ],
+      "why_keep": "Deep CV advances in hierarchical 3D spatial reasoning for VLMs directly boost IVS spatial intelligence, benchmarks, and real-time deployment tradeoffs."
+    }
+  ]
+}

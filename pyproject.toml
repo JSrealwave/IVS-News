@@ -1,0 +1,22 @@
+[project]
+name = "ivs-news"
+version = "0.1.0"
+description = "IVS News project"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph",
+    "langchain",
+    "langchain-community",
+    "tavily-python",
+    "arxiv",
+    "pydantic",
+    "python-dotenv",
+    "scikit-learn",
+    "openai",
+    "sentence-transformers",
+    "torch>=2.3,<2.6",
+    "transformers<4.53",
+    "numpy<2",
+    "supabase>=2.28.3",
+]

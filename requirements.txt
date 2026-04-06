@@ -1,0 +1,12 @@
+langgraph
+langchain
+langchain-community
+tavily-python
+arxiv
+sentence-transformers
+pydantic
+python-dotenv
+scikit-learn
+openai
+supabase
+feedparser
