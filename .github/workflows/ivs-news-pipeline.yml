@@ -18,13 +18,8 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Set up Python
-        run: |
-          uv python install 3.12 --default
-          uv --version
-
       - name: Install dependencies
-        run: uv pip install -r requirements.txt
+        run: uv sync --frozen
 
       - name: Run IVS News Pipeline
         env:
@@ -34,7 +29,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: uv run python pipeline.py --run
 
-      - name: Commit updated articles.json (optional)
+      - name: Commit updated articles.json (optional backup)
         if: always()
         run: |
           git config user.name "github-actions[bot]"
