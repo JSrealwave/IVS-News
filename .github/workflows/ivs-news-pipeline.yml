@@ -1,4 +1,4 @@
-name: IVS News Daily Pipeline
+run: uv run python pipeline.py --run --model grok-4-1-fast-non-reasoningname: IVS News Daily Pipeline
 
 on:
   schedule:
@@ -27,7 +27,7 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: uv run python pipeline.py --run
+        run: uv run python pipeline.py --run --model grok-4-1-fast-non-reasoning
 
       - name: Commit updated articles.json (optional backup)
         if: always()
