@@ -1,4 +1,5 @@
-run: uv run python pipeline.py --run --model grok-4-1-fast-non-reasoningname: IVS News Daily Pipeline
+
+name: IVS News Daily Pipeline
 
 on:
   schedule:
