@@ -2,8 +2,8 @@ name: IVS News Daily Pipeline
 
 on:
   schedule:
-    - cron: '0 13 * * *'     # Runs at 13:00 UTC = 6:00 AM PDT (adjust if needed)
-  workflow_dispatch:         # Allows manual trigger from GitHub UI
+    - cron: '0 13 * * *'     # 13:00 UTC = 6:00 AM PDT
+  workflow_dispatch:         # Manual trigger
 
 jobs:
   run-pipeline:
@@ -13,19 +13,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          version: "latest"
+          enable-cache: true
 
-      - name: Install uv (fast package manager)
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up Python
+        run: uv python install
 
       - name: Install dependencies
-        run: |
-          uv venv
-          uv pip install -r requirements.txt
+        run: uv pip install -r requirements.txt
 
       - name: Run IVS News Pipeline
         env:
@@ -33,16 +31,14 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          source .venv/bin/activate
-          python pipeline.py --run
+        run: uv run python pipeline.py --run
 
       - name: Commit updated articles.json (optional backup)
         if: always()
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add articles.json
-          git commit -m "Update articles.json from daily run" || echo "No changes to commit"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add articles.json || true
+          git commit -m "Update articles.json from daily run [skip ci]" || echo "No changes to commit"
           git push
         continue-on-error: true
