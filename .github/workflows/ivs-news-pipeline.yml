@@ -1,9 +1,8 @@
-
 name: IVS News Daily Pipeline
 
 on:
   schedule:
-    - cron: '0 13 * * *'     # 6:00 AM PDT
+    - cron: '0 13 * * *'   # 13:00 UTC = 6 AM PDT
   workflow_dispatch:
 
 jobs:
@@ -14,10 +13,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install uv
+      - name: Setup uv
         uses: astral-sh/setup-uv@v5
         with:
-          enable-cache: true
+          version: "latest"
 
       - name: Install dependencies
         run: uv sync --frozen
