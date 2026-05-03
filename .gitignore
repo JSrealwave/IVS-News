@@ -10,3 +10,6 @@ wheels/
 # Virtual environments
 .venv
 .env
+.DS_Store
+*.log
+x_test.py
