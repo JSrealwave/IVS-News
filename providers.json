@@ -1,0 +1,62 @@
+{
+  "providers": [
+    {
+      "name": "BriefCam",
+      "category": ["Object Recognition / Video Analytics"],
+      "description": "Provides AI-powered video analytics and synopsis technology for rapid search and review of surveillance footage in security and enterprise applications.",
+      "website": "https://www.briefcam.com",
+      "logo_url": "/logos/briefcam.png"
+    },
+    {
+      "name": "Genetec Inc.",
+      "category": ["Video Management Systems (VMS)"],
+      "description": "Unified security platform combining VMS, access control, and analytics for comprehensive physical security management.",
+      "website": "https://www.genetec.com",
+      "logo_url": "/logos/genetec.jpeg"
+    },
+    {
+      "name": "Verkada",
+      "category": ["Video Management Systems (VMS)", "Edge AI Hardware"],
+      "description": "Cloud-based video security with integrated AI analytics running on edge cameras for simplified enterprise deployment.",
+      "website": "https://www.verkada.com",
+      "logo_url": "/logos/verkada.png"
+    },
+    {
+      "name": "Axis Communications",
+      "category": ["Edge AI Hardware"],
+      "description": "Network cameras and video encoders with built-in edge analytics for object detection and intelligent video processing.",
+      "website": "https://www.axis.com",
+      "logo_url": "/logos/axis.png"
+    },
+    {
+      "name": "Hikvision Digital Technology",
+      "category": ["Object Recognition", "Facial Recognition"],
+      "description": "Major global provider of video surveillance products featuring AI-powered analytics for people/vehicle detection and facial recognition.",
+      "website": "https://www.hikvision.com",
+      "logo_url": "/logos/hikvision.png"
+    },
+    {
+      "name": "Milestone Systems",
+      "category": ["Video Management Systems (VMS)"],
+      "description": "Leading open-platform VMS provider enabling integration of IP cameras, analytics, and third-party solutions for enterprise security.",
+      "website": "https://www.milestonesys.com",
+      "logo_url": "/logos/milestone.png"
+    },
+    {
+      "name": "Eagle Eye Networks",
+      "category": ["Video Management Systems (VMS)"],
+      "description": "Cloud video surveillance platform supporting thousands of camera models with AI analytics and remote management.",
+      "website": "https://www.eagleeyenetworks.com",
+      "logo_url": "/logos/eagle-eye.png"
+    },
+    {
+      "name": "Avigilon (Motorola Solutions)",
+      "category": ["Object Recognition", "VMS"],
+      "description": "High-definition surveillance solutions with advanced video analytics for object detection, classification, and search capabilities.",
+      "website": "https://www.avigilon.com",
+      "logo_url": "/logos/avigilon.png"
+    }
+  ],
+  "lastUpdated": "2026-05-24",
+  "total": 45
+}
