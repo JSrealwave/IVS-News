@@ -2,59 +2,363 @@
   "providers": [
     {
       "name": "BriefCam",
-      "category": ["Object Recognition / Video Analytics"],
+      "category": "Object Recognition",
       "description": "Provides AI-powered video analytics and synopsis technology for rapid search and review of surveillance footage in security and enterprise applications.",
       "website": "https://www.briefcam.com",
-      "logo_url": "/logos/briefcam.png"
+      "logo_url": "/logos/briefcam.png",
+      "status": "active"
     },
     {
-      "name": "Genetec Inc.",
-      "category": ["Video Management Systems (VMS)"],
-      "description": "Unified security platform combining VMS, access control, and analytics for comprehensive physical security management.",
-      "website": "https://www.genetec.com",
-      "logo_url": "/logos/genetec.jpeg"
+      "name": "Oosto (formerly AnyVision)",
+      "category": "Facial Recognition",
+      "description": "Develops facial recognition platforms for real-time identification and security use cases across airports, retail, and critical infrastructure.",
+      "website": "https://www.oosto.com",
+      "logo_url": "/logos/oosto.jpeg",
+      "status": "active"
     },
     {
-      "name": "Verkada",
-      "category": ["Video Management Systems (VMS)", "Edge AI Hardware"],
-      "description": "Cloud-based video security with integrated AI analytics running on edge cameras for simplified enterprise deployment.",
-      "website": "https://www.verkada.com",
-      "logo_url": "/logos/verkada.png"
+      "name": "IronYun",
+      "category": "LPR/OCR, Object Recognition",
+      "description": "Offers AI video analytics platform specializing in license plate recognition (LPR), object detection, and behavior analysis for surveillance.",
+      "website": "https://www.ironyun.com",
+      "logo_url": "/logos/ironyun.png",
+      "status": "active"
     },
     {
-      "name": "Axis Communications",
-      "category": ["Edge AI Hardware"],
-      "description": "Network cameras and video encoders with built-in edge analytics for object detection and intelligent video processing.",
-      "website": "https://www.axis.com",
-      "logo_url": "/logos/axis.png"
-    },
-    {
-      "name": "Hikvision Digital Technology",
-      "category": ["Object Recognition", "Facial Recognition"],
-      "description": "Major global provider of video surveillance products featuring AI-powered analytics for people/vehicle detection and facial recognition.",
-      "website": "https://www.hikvision.com",
-      "logo_url": "/logos/hikvision.png"
+      "name": "PlateSmart Technologies",
+      "category": "LPR/OCR",
+      "description": "Focuses on advanced license plate recognition software with high accuracy for law enforcement, parking, and security applications.",
+      "website": "https://www.platesmart.com",
+      "logo_url": "/logos/platesmart.png",
+      "status": "active"
     },
     {
       "name": "Milestone Systems",
-      "category": ["Video Management Systems (VMS)"],
+      "category": "VMS",
       "description": "Leading open-platform VMS provider enabling integration of IP cameras, analytics, and third-party solutions for enterprise security.",
       "website": "https://www.milestonesys.com",
-      "logo_url": "/logos/milestone.png"
+      "logo_url": "/logos/milestone.png",
+      "status": "active"
     },
     {
-      "name": "Eagle Eye Networks",
-      "category": ["Video Management Systems (VMS)"],
-      "description": "Cloud video surveillance platform supporting thousands of camera models with AI analytics and remote management.",
-      "website": "https://www.eagleeyenetworks.com",
-      "logo_url": "/logos/eagle-eye.png"
+      "name": "Genetec Inc.",
+      "category": "VMS",
+      "description": "Unified security platform combining VMS, access control, and analytics for comprehensive physical security management.",
+      "website": "https://www.genetec.com",
+      "logo_url": "/logos/genetec.jpeg",
+      "status": "active"
     },
     {
       "name": "Avigilon (Motorola Solutions)",
-      "category": ["Object Recognition", "VMS"],
+      "category": "Object Recognition, VMS",
       "description": "High-definition surveillance solutions with advanced video analytics for object detection, classification, and search capabilities.",
       "website": "https://www.avigilon.com",
-      "logo_url": "/logos/avigilon.png"
+      "logo_url": "/logos/avigilon.png",
+      "status": "active"
+    },
+    {
+      "name": "Verkada",
+      "category": "VMS, Edge AI Hardware",
+      "description": "Cloud-based video security with integrated AI analytics running on edge cameras for simplified enterprise deployment.",
+      "website": "https://www.verkada.com",
+      "logo_url": "/logos/verkada.png",
+      "status": "active"
+    },
+    {
+      "name": "Rhombus Systems",
+      "category": "VMS",
+      "description": "AI-native cloud video platform offering intelligent alerts, object detection, and scalable surveillance for businesses.",
+      "website": "https://www.rhombus.com",
+      "logo_url": "/logos/rhombus.png",
+      "status": "active"
+    },
+    {
+      "name": "Eagle Eye Networks",
+      "category": "VMS",
+      "description": "Cloud video surveillance platform supporting thousands of camera models with AI analytics and remote management.",
+      "website": "https://www.eagleeyenetworks.com",
+      "logo_url": "/logos/eagle-eye.png",
+      "status": "active"
+    },
+    {
+      "name": "Axis Communications",
+      "category": "Edge AI Hardware",
+      "description": "Network cameras and video encoders with built-in edge analytics for object detection and intelligent video processing.",
+      "website": "https://www.axis.com",
+      "logo_url": "/logos/axis.png",
+      "status": "active"
+    },
+    {
+      "name": "Hikvision Digital Technology",
+      "category": "Object Recognition, Facial Recognition",
+      "description": "Major global provider of video surveillance products featuring AI-powered analytics for people/vehicle detection and facial recognition.",
+      "website": "https://www.hikvision.com",
+      "logo_url": "/logos/hikvision.png",
+      "status": "active"
+    },
+    {
+      "name": "Dahua Technology",
+      "category": "LPR/OCR, Object Recognition",
+      "description": "Comprehensive security solutions including AI video analytics, LPR cameras, and smart city surveillance platforms.",
+      "website": "https://www.dahuasecurity.com",
+      "logo_url": "/logos/dahua.png",
+      "status": "active"
+    },
+    {
+      "name": "Calipsa",
+      "category": "Object Recognition",
+      "description": "AI platform that filters video alarms and provides object classification analytics for monitoring stations and integrators.",
+      "website": "https://www.calipsa.io",
+      "logo_url": "/logos/calipsa.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Ambient.ai",
+      "category": "Object Recognition",
+      "description": "AI computer vision platform for physical security that identifies objects, behaviors, and threats in real time.",
+      "website": "https://www.ambient.ai",
+      "logo_url": "/logos/ambient.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Evolv Technology",
+      "category": "Object Recognition",
+      "description": "AI-based weapons detection systems using advanced object recognition for secure venues and screening.",
+      "website": "https://www.evolvtechnology.com",
+      "logo_url": "/logos/evolv.png",
+      "status": "active"
+    },
+    {
+      "name": "NoTraffic",
+      "category": "LPR/OCR",
+      "description": "AI-powered traffic management platform with license plate recognition and real-time analytics for smart cities.",
+      "website": "https://www.notraffic.com",
+      "logo_url": "/logos/notraffic.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Vivacity Labs",
+      "category": "LPR/OCR, Object Recognition",
+      "description": "AI analytics for traffic and urban environments, including vehicle classification, LPR, and congestion monitoring.",
+      "website": "https://vivacitylabs.com",
+      "logo_url": "/logos/viva_city.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Network Optix",
+      "category": "VMS",
+      "description": "Customizable VMS platform (Nx Witness) designed for integrators with strong analytics and hardware support.",
+      "website": "https://www.networkoptix.com",
+      "logo_url": "/logos/network_optix.png",
+      "status": "active"
+    },
+    {
+      "name": "Camio",
+      "category": "Object Recognition",
+      "description": "Cloud AI video analytics platform enabling natural language search and real-time object-based alerts.",
+      "website": "https://www.camio.com",
+      "logo_url": "/logos/camio.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Idemia",
+      "category": "Facial Recognition",
+      "description": "Global leader in biometric identification providing facial recognition solutions for border control, law enforcement, and secure access in surveillance environments.",
+      "website": "https://www.idemia.com",
+      "logo_url": "/logos/idemia.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "NEC Corporation",
+      "category": "Facial Recognition",
+      "description": "Offers advanced facial recognition technology with high accuracy in challenging conditions for public safety and enterprise security applications.",
+      "website": "https://www.nec.com",
+      "logo_url": "/logos/nec.png",
+      "status": "active"
+    },
+    {
+      "name": "Megvii (Face++)",
+      "category": "Facial Recognition, Object Recognition",
+      "description": "Develops AI-powered facial recognition and video analytics platforms widely used in smart city and security surveillance deployments.",
+      "website": "https://www.megvii.com",
+      "logo_url": "/logos/megvii.png",
+      "status": "active"
+    },
+    {
+      "name": "SenseTime",
+      "category": "Facial Recognition, Object Recognition",
+      "description": "Provides AI computer vision solutions including facial recognition and video analytics for intelligent surveillance and smart city projects.",
+      "website": "https://www.sensetime.com",
+      "logo_url": "/logos/sensetime.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Corsight AI",
+      "category": "Facial Recognition",
+      "description": "Specializes in facial recognition optimized for low-light and challenging conditions in security and defense video surveillance.",
+      "website": "https://www.corsight.ai",
+      "logo_url": "/logos/corsight_ai.png",
+      "status": "active"
+    },
+    {
+      "name": "Vigilant Solutions (Motorola)",
+      "category": "LPR/OCR",
+      "description": "Delivers license plate recognition and vehicle identification solutions integrated with law enforcement and security surveillance systems.",
+      "website": "https://www.vigilantsolutions.com",
+      "logo_url": "/logos/vigilant.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Perceptics",
+      "category": "LPR/OCR",
+      "description": "Provides high-performance license plate recognition and vehicle analytics for tolling, border security, and surveillance applications.",
+      "website": "https://www.perceptics.com",
+      "logo_url": "/logos/perceptics.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Kapsch TrafficCom",
+      "category": "LPR/OCR",
+      "description": "Offers LPR and traffic analytics solutions for intelligent transportation and security monitoring on highways and urban environments.",
+      "website": "https://www.kapsch.net",
+      "logo_url": "/logos/kapsch.png",
+      "status": "active"
+    },
+    {
+      "name": "NDI Recognition Systems",
+      "category": "LPR/OCR",
+      "description": "Specializes in automatic number plate recognition (ANPR/LPR) systems for security, parking, and law enforcement video applications.",
+      "website": "https://www.ndi-rs.com",
+      "logo_url": "/logos/NDI.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Hailo",
+      "category": "Edge AI Hardware",
+      "description": "Develops high-performance AI processors optimized for edge inference in video analytics cameras and surveillance devices.",
+      "website": "https://www.hailo.ai",
+      "logo_url": "/logos/hailo.png",
+      "status": "active"
+    },
+    {
+      "name": "Ambarella",
+      "category": "Edge AI Hardware",
+      "description": "Provides system-on-chip solutions with advanced AI video processing for security cameras and edge analytics applications.",
+      "website": "https://www.ambarella.com",
+      "logo_url": "/logos/ambarella.png",
+      "status": "active"
+    },
+    {
+      "name": "Intel",
+      "category": "Edge AI Hardware",
+      "description": "Offers OpenVINO toolkit and edge AI hardware (Movidius, Xeon) for accelerating video analytics and computer vision at the edge.",
+      "website": "https://www.intel.com",
+      "logo_url": "/logos/intel.png",
+      "status": "active"
+    },
+    {
+      "name": "Qualcomm",
+      "category": "Edge AI Hardware",
+      "description": "Snapdragon and AI 100 platforms enabling on-device video analytics and edge inference for security cameras and IoT surveillance.",
+      "website": "https://www.qualcomm.com",
+      "logo_url": "/logos/qualcomm.png",
+      "status": "active"
+    },
+    {
+      "name": "Google (Coral)",
+      "category": "Edge AI Hardware",
+      "description": "Coral Edge TPU hardware and software stack for efficient on-device machine learning in video surveillance and analytics.",
+      "website": "https://coral.ai",
+      "logo_url": "/logos/coral.png",
+      "status": "active"
+    },
+    {
+      "name": "Viisights",
+      "category": "Object Recognition",
+      "description": "AI video analytics platform focused on behavioral understanding and real-time threat detection for security and smart city surveillance.",
+      "website": "https://www.viisights.com",
+      "logo_url": "/logos/viisights.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "Agent Video Intelligence (Agent Vi)",
+      "category": "Object Recognition",
+      "description": "Provides video analytics solutions for real-time object detection, classification, and alerts in enterprise security systems.",
+      "website": "https://www.agentvi.com",
+      "logo_url": "/logos/agentvi.png",
+      "status": "active"
+    },
+    {
+      "name": "Actuate",
+      "category": "Object Recognition",
+      "description": "AI-powered video analytics for real-time detection of threats, weapons, and suspicious behavior in surveillance feeds.",
+      "website": "https://www.actuate.ai",
+      "logo_url": "/logos/actuate.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "PureTech Systems",
+      "category": "Object Recognition",
+      "description": "Offers geospatial video analytics and object tracking solutions for perimeter security and critical infrastructure protection.",
+      "website": "https://www.puretechsystems.com",
+      "logo_url": "/logos/puretech.png",
+      "status": "active"
+    },
+    {
+      "name": "Digital Barriers",
+      "category": "Object Recognition",
+      "description": "Provides edge-based video analytics and streaming solutions for defense, security, and public safety surveillance.",
+      "website": "https://www.digitalbarriers.com",
+      "logo_url": "/logos/digital_barriers.png",
+      "status": "active"
+    },
+    {
+      "name": "SeeQuestor",
+      "category": "Object Recognition, LPR/OCR",
+      "description": "AI video search and analytics platform with strong LPR and object recognition capabilities for investigative and real-time use.",
+      "website": "https://www.seequestor.com",
+      "logo_url": "/logos/seequestor.png",
+      "status": "active"
+    },
+    {
+      "name": "Evolon",
+      "category": "Object Recognition",
+      "description": "AI video analytics software for business intelligence, security, and operational insights from surveillance footage.",
+      "website": "https://www.evolon.com",
+      "logo_url": "/logos/evolon.png",
+      "status": "active"
+    },
+    {
+      "name": "VCA Technology",
+      "category": "Object Recognition",
+      "description": "Develops video analytics algorithms for intrusion detection, loitering, and object classification in security applications.",
+      "website": "https://www.vcatechnology.com",
+      "logo_url": "/logos/vca.jpeg",
+      "status": "active"
+    },
+    {
+      "name": "iProov",
+      "category": "Facial Recognition",
+      "description": "Specializes in facial biometric verification with liveness detection for secure identity in surveillance and access control.",
+      "website": "https://www.iproov.com",
+      "logo_url": "/logos/iproov.png",
+      "status": "active"
+    },
+    {
+      "name": "Clearview AI",
+      "category": "Facial Recognition",
+      "description": "Provides facial recognition search engine used by law enforcement for identifying individuals from surveillance imagery.",
+      "website": "https://www.clearview.ai",
+      "logo_url": "/logos/clearview.png",
+      "status": "active"
+    },
+    {
+      "name": "Groq",
+      "category": "Edge AI Hardware",
+      "description": "High-speed inference chips optimized for real-time video analytics and large model deployment at the edge.",
+      "website": "https://groq.com",
+      "logo_url": "/logos/groq.jpeg",
+      "status": "active"
     }
   ],
   "lastUpdated": "2026-05-24",
