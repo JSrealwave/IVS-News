@@ -3,13 +3,18 @@ import argparse
 import json
 import os
 import re
+import threading
 import time
-from datetime import datetime
-from typing import Dict, List, NotRequired, TypedDict
-from urllib.parse import urlparse, urlunparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+from typing import Any, Dict, List, NotRequired, TypedDict
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import arxiv
 import feedparser
+import requests
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 from openai import OpenAI
@@ -58,6 +63,118 @@ DEFAULT_QUERIES = [
 _ARXIV_ID_RE = re.compile(
     r"arxiv\.org/(?:abs|pdf)/([\w.-]+)(?:\.pdf)?", re.IGNORECASE
 )
+_DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+    )
+}
+_IMAGE_CACHE_TTL_DAYS = 30
+_IMAGE_CACHE_PATH = os.getenv("IMAGE_CACHE_PATH", "image_cache.json")
+_IMAGE_REQUEST_TIMEOUT_SECONDS = 12
+_IMAGE_REQUEST_RETRIES = 4
+_TAVILY_MAX_RESULTS = 12
+_RSS_ENTRIES_PER_FEED = 12
+_SEARCH_RESULTS_CAP = 65
+_PAGE_FETCH_CACHE: Dict[str, Dict[str, Any]] = {}
+_PAGE_FETCH_LOCK = threading.RLock()
+_image_cache_lock = threading.RLock()
+_image_stats_lock = threading.Lock()
+_image_runtime_stats: Dict[str, int] = {
+    "cache_hits": 0,
+    "http_requests": 0,
+    "request_errors": 0,
+    "rate_limit_errors": 0,
+}
+
+
+def _reset_image_runtime_stats() -> None:
+    with _image_stats_lock:
+        for key in _image_runtime_stats:
+            _image_runtime_stats[key] = 0
+
+
+def _increment_image_stat(name: str, amount: int = 1) -> None:
+    with _image_stats_lock:
+        _image_runtime_stats[name] = _image_runtime_stats.get(name, 0) + amount
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return any(token in text for token in ["429", "rate limit", "too many requests"])
+
+
+def _load_image_cache() -> Dict[str, Dict[str, Any]]:
+    try:
+        with open(_IMAGE_CACHE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+_image_cache: Dict[str, Dict[str, Any]] = _load_image_cache()
+
+
+def _persist_image_cache() -> None:
+    with _image_cache_lock:
+        try:
+            with open(_IMAGE_CACHE_PATH, "w", encoding="utf-8") as f:
+                json.dump(_image_cache, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+
+def _get_cached_image(article_url: str | None) -> str | None | object:
+    normalized_url = normalize_article_url_for_image(article_url)
+    if not normalized_url:
+        return None
+
+    key = canonical_url_key(normalized_url)
+    if not key:
+        return None
+
+    with _image_cache_lock:
+        entry = _image_cache.get(key)
+
+    if not entry:
+        return _CACHE_MISS
+
+    fetched_at_raw = entry.get("fetched_at")
+    if not fetched_at_raw:
+        return _CACHE_MISS
+
+    try:
+        fetched_at = datetime.fromisoformat(fetched_at_raw)
+    except Exception:
+        return _CACHE_MISS
+
+    if datetime.utcnow() - fetched_at > timedelta(days=_IMAGE_CACHE_TTL_DAYS):
+        return _CACHE_MISS
+
+    cached_image = entry.get("image")
+    return cached_image if isinstance(cached_image, str) and cached_image else None
+
+
+def _set_cached_image(article_url: str | None, image_url: str | None) -> None:
+    normalized_url = normalize_article_url_for_image(article_url)
+    if not normalized_url:
+        return
+
+    key = canonical_url_key(normalized_url)
+    if not key:
+        return
+
+    with _image_cache_lock:
+        _image_cache[key] = {
+            "url": normalized_url,
+            "image": image_url,
+            "fetched_at": datetime.utcnow().isoformat(),
+        }
+    _persist_image_cache()
+
+
+_CACHE_MISS = object()
 
 
 def canonical_url_key(url: str | None) -> str:
@@ -91,6 +208,549 @@ def dedupe_items_by_url(items: List[Dict]) -> List[Dict]:
         seen.add(key)
         out.append(item)
     return out
+
+
+def _normalize_title_key(title: str | None) -> str:
+    if not title or not isinstance(title, str):
+        return ""
+    cleaned = re.sub(r"[^\w\s]", " ", title.lower())
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def dedupe_items_by_title(items: List[Dict]) -> List[Dict]:
+    """Drop near-duplicate headlines after URL deduplication."""
+    seen: set[str] = set()
+    out: List[Dict] = []
+    for item in items:
+        key = _normalize_title_key(item.get("title"))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def _to_utc_iso(dt: datetime) -> str:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.isoformat()
+
+
+def _parse_datetime_string(value: str | None) -> str | None:
+    if not value or not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+
+    try:
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = datetime.fromisoformat(raw)
+        return _to_utc_iso(dt)
+    except Exception:
+        pass
+
+    try:
+        dt = parsedate_to_datetime(raw)
+        return _to_utc_iso(dt)
+    except Exception:
+        pass
+
+    for fmt in (
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%d %b %Y",
+        "%B %d, %Y",
+    ):
+        try:
+            dt = datetime.strptime(raw[:19] if "T" in fmt else raw[:10], fmt)
+            return _to_utc_iso(dt.replace(tzinfo=timezone.utc))
+        except Exception:
+            continue
+
+    return None
+
+
+def _struct_time_to_iso(st: Any) -> str | None:
+    if not st:
+        return None
+    try:
+        dt = datetime(*st[:6], tzinfo=timezone.utc)
+        return _to_utc_iso(dt)
+    except Exception:
+        return None
+
+
+def _parse_feed_entry_date(entry: Any) -> str | None:
+    for attr in ("published_parsed", "updated_parsed", "created_parsed"):
+        parsed = getattr(entry, attr, None)
+        iso = _struct_time_to_iso(parsed)
+        if iso:
+            return iso
+
+    for attr in ("published", "updated", "created"):
+        iso = _parse_datetime_string(entry.get(attr))
+        if iso:
+            return iso
+
+    return None
+
+
+def _parse_feed_entry_image(entry: Any) -> str | None:
+    thumbs = entry.get("media_thumbnail") or entry.get("media_thumbnails")
+    if isinstance(thumbs, list) and thumbs:
+        url = thumbs[0].get("url") if isinstance(thumbs[0], dict) else None
+        if url:
+            return url.strip()
+
+    media = entry.get("media_content") or entry.get("enclosures")
+    if isinstance(media, list):
+        for item in media:
+            if not isinstance(item, dict):
+                continue
+            media_type = (item.get("type") or item.get("medium") or "").lower()
+            url = item.get("url") or item.get("href")
+            if url and ("image" in media_type or not media_type):
+                return url.strip()
+
+    image_block = entry.get("image")
+    if isinstance(image_block, dict):
+        href = image_block.get("href") or image_block.get("url")
+        if isinstance(href, str) and href.strip():
+            return href.strip()
+
+    return None
+
+
+def _extract_schema_date(value: Any) -> str | None:
+    if isinstance(value, str):
+        return _parse_datetime_string(value)
+    if isinstance(value, list):
+        for item in value:
+            parsed = _extract_schema_date(item)
+            if parsed:
+                return parsed
+    if isinstance(value, dict):
+        for key in ("datePublished", "dateModified", "uploadDate", "dateCreated"):
+            if key in value:
+                parsed = _extract_schema_date(value[key])
+                if parsed:
+                    return parsed
+    return None
+
+
+def _find_schema_published(soup: BeautifulSoup) -> str | None:
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        raw = script.string or script.get_text(strip=True)
+        if not raw:
+            continue
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            continue
+
+        nodes = parsed if isinstance(parsed, list) else [parsed]
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            for key in ("datePublished", "dateModified", "uploadDate"):
+                candidate = _extract_schema_date(node.get(key))
+                if candidate:
+                    return candidate
+            graph = node.get("@graph")
+            if isinstance(graph, list):
+                for graph_node in graph:
+                    if isinstance(graph_node, dict):
+                        nested = _find_schema_published_from_node(graph_node)
+                        if nested:
+                            return nested
+    return None
+
+
+def _find_schema_published_from_node(node: Dict[str, Any]) -> str | None:
+    for key in ("datePublished", "dateModified", "uploadDate"):
+        candidate = _extract_schema_date(node.get(key))
+        if candidate:
+            return candidate
+    return None
+
+
+def _find_html_published(soup: BeautifulSoup) -> str | None:
+    meta_specs = [
+        ("meta", {"property": "article:published_time"}, "content"),
+        ("meta", {"property": "og:published_time"}, "content"),
+        ("meta", {"name": "article:published_time"}, "content"),
+        ("meta", {"name": "pubdate"}, "content"),
+        ("meta", {"name": "publish-date"}, "content"),
+        ("meta", {"name": "date"}, "content"),
+        ("meta", {"itemprop": "datePublished"}, "content"),
+        ("meta", {"property": "article:modified_time"}, "content"),
+        ("time", {"pubdate": True}, "datetime"),
+        ("time", {"itemprop": "datePublished"}, "datetime"),
+    ]
+    for tag_name, attrs, attr_key in meta_specs:
+        tag = soup.find(tag_name, attrs=attrs)
+        if tag and tag.get(attr_key):
+            parsed = _parse_datetime_string(tag[attr_key])
+            if parsed:
+                return parsed
+
+    time_tag = soup.find("time", attrs={"datetime": True})
+    if time_tag and time_tag.get("datetime"):
+        parsed = _parse_datetime_string(time_tag["datetime"])
+        if parsed:
+            return parsed
+
+    return _find_schema_published(soup)
+
+
+def _fetch_article_page(normalized_url: str) -> BeautifulSoup | None:
+    with _PAGE_FETCH_LOCK:
+        cached = _PAGE_FETCH_CACHE.get(normalized_url)
+        if cached and cached.get("soup") is not None:
+            return cached["soup"]
+
+    last_error: Exception | None = None
+    for attempt in range(1, _IMAGE_REQUEST_RETRIES + 1):
+        try:
+            _increment_image_stat("http_requests")
+            headers = {
+                **_DEFAULT_HEADERS,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+            if attempt > 1:
+                headers["Cache-Control"] = "no-cache"
+
+            response = requests.get(
+                normalized_url,
+                headers=headers,
+                timeout=_IMAGE_REQUEST_TIMEOUT_SECONDS,
+                allow_redirects=True,
+            )
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            with _PAGE_FETCH_LOCK:
+                _PAGE_FETCH_CACHE[normalized_url] = {
+                    "soup": soup,
+                    "final_url": response.url,
+                }
+            return soup
+        except Exception as e:
+            last_error = e
+            _increment_image_stat("request_errors")
+            if _is_rate_limit_error(e):
+                _increment_image_stat("rate_limit_errors")
+            if attempt < _IMAGE_REQUEST_RETRIES:
+                time.sleep(attempt * 0.75)
+
+    with _PAGE_FETCH_LOCK:
+        _PAGE_FETCH_CACHE[normalized_url] = {"soup": None, "error": str(last_error)}
+    return None
+
+
+def extract_published_at(
+    article_url: str | None, article: Dict | None = None
+) -> str | None:
+    article = article or {}
+    existing = article.get("published_at")
+    if isinstance(existing, str) and existing.strip():
+        return _parse_datetime_string(existing) or existing.strip()
+
+    normalized_url = normalize_article_url_for_image(article_url)
+    if normalized_url:
+        soup = _fetch_article_page(normalized_url)
+        if soup:
+            html_date = _find_html_published(soup)
+            if html_date:
+                return html_date
+
+    return None
+
+
+def normalize_article_url_for_image(url: str | None) -> str | None:
+    """Convert article URL to an HTML page URL suitable for meta-tag scraping."""
+    if not url:
+        return None
+
+    url = url.strip()
+    m = _ARXIV_ID_RE.search(url)
+    if m:
+        return f"https://arxiv.org/abs/{m.group(1)}"
+    return url
+
+
+def _extract_schema_image(value: Any) -> str | None:
+    if isinstance(value, str):
+        return value.strip() or None
+
+    if isinstance(value, list):
+        for item in value:
+            candidate = _extract_schema_image(item)
+            if candidate:
+                return candidate
+
+    if isinstance(value, dict):
+        if isinstance(value.get("url"), str) and value["url"].strip():
+            return value["url"].strip()
+        if isinstance(value.get("contentUrl"), str) and value["contentUrl"].strip():
+            return value["contentUrl"].strip()
+
+    return None
+
+
+def _find_schema_image(soup: BeautifulSoup) -> str | None:
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        raw = script.string or script.get_text(strip=True)
+        if not raw:
+            continue
+
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            continue
+
+        nodes = parsed if isinstance(parsed, list) else [parsed]
+        for node in nodes:
+            if isinstance(node, dict):
+                candidate = _extract_schema_image(node.get("image"))
+                if candidate:
+                    return candidate
+                graph = node.get("@graph")
+                if isinstance(graph, list):
+                    for graph_node in graph:
+                        if isinstance(graph_node, dict):
+                            nested = _extract_schema_image(graph_node.get("image"))
+                            if nested:
+                                return nested
+
+    return None
+
+
+def _normalize_image_candidate(
+    base_url: str,
+    candidate: str | None,
+    *,
+    strict_logo_filter: bool = True,
+) -> str | None:
+    if not candidate:
+        return None
+
+    candidate = candidate.strip()
+    if not candidate or candidate.startswith(("data:", "javascript:")):
+        return None
+
+    resolved = urljoin(base_url, candidate)
+    parsed = urlparse(resolved)
+    if parsed.scheme not in {"http", "https"}:
+        return None
+
+    lowered = resolved.lower()
+    if strict_logo_filter and any(
+        token in lowered for token in ["sprite", "favicon", "1x1", "pixel.gif"]
+    ):
+        return None
+    if strict_logo_filter and any(
+        token in lowered for token in ["logo", "icon", "avatar"]
+    ):
+        if not any(
+            token in lowered
+            for token in ["og-image", "og_image", "featured", "hero", "thumb", "cover"]
+        ):
+            return None
+
+    return resolved
+
+
+def _candidate_score(tag) -> int:
+    score = 0
+    try:
+        width = int(float(tag.get("width", 0) or 0))
+        height = int(float(tag.get("height", 0) or 0))
+        score += width * height
+        if width >= 320:
+            score += 20000
+        if height >= 180:
+            score += 15000
+    except Exception:
+        pass
+
+    classes = " ".join(tag.get("class", [])) if isinstance(tag.get("class"), list) else str(tag.get("class", ""))
+    attrs_text = f"{classes} {tag.get('alt', '')} {tag.get('src', '')}".lower()
+    if any(token in attrs_text for token in ["hero", "featured", "lead", "main"]):
+        score += 30000
+    if any(token in attrs_text for token in ["logo", "icon", "avatar", "sprite"]):
+        score -= 50000
+    return score
+
+
+def _find_best_img_tag(soup: BeautifulSoup, base_url: str) -> str | None:
+    candidates: List[tuple[int, str]] = []
+    for img in soup.find_all("img"):
+        src = (
+            img.get("src")
+            or img.get("data-src")
+            or img.get("data-original")
+            or img.get("data-lazy-src")
+        )
+        candidate = _normalize_image_candidate(base_url, src)
+        if candidate:
+            candidates.append((_candidate_score(img), candidate))
+
+        srcset = img.get("srcset") or img.get("data-srcset")
+        if srcset:
+            for item in srcset.split(","):
+                part = item.strip().split(" ")[0]
+                normalized = _normalize_image_candidate(base_url, part)
+                if normalized:
+                    candidates.append((_candidate_score(img) + 5000, normalized))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
+
+
+def _extract_image_from_soup(soup: BeautifulSoup, base_url: str) -> str | None:
+    selectors = [
+        ("meta", {"property": "og:image:secure_url"}, "content"),
+        ("meta", {"property": "og:image"}, "content"),
+        ("meta", {"name": "og:image"}, "content"),
+        ("meta", {"property": "og:image:url"}, "content"),
+        ("meta", {"name": "twitter:image"}, "content"),
+        ("meta", {"property": "twitter:image"}, "content"),
+        ("meta", {"name": "twitter:image:src"}, "content"),
+        ("meta", {"name": "thumbnail"}, "content"),
+        ("meta", {"itemprop": "image"}, "content"),
+        ("link", {"rel": "image_src"}, "href"),
+        ("link", {"rel": "apple-touch-icon"}, "href"),
+    ]
+
+    for tag_name, attrs, attr_key in selectors:
+        tag = soup.find(tag_name, attrs=attrs)
+        if tag and tag.get(attr_key):
+            image_url = _normalize_image_candidate(
+                base_url,
+                tag[attr_key],
+                strict_logo_filter=False,
+            )
+            if image_url:
+                return image_url
+
+    for tag in soup.find_all(attrs={"itemprop": "image"}):
+        src = tag.get("src") or tag.get("content") or tag.get("href")
+        image_url = _normalize_image_candidate(
+            base_url, src, strict_logo_filter=False
+        )
+        if image_url:
+            return image_url
+
+    schema_image = _find_schema_image(soup)
+    image_url = _normalize_image_candidate(
+        base_url, schema_image, strict_logo_filter=False
+    )
+    if image_url:
+        return image_url
+
+    for picture in soup.find_all("picture"):
+        for source in picture.find_all("source"):
+            srcset = source.get("srcset") or source.get("data-srcset")
+            if not srcset:
+                continue
+            for item in srcset.split(","):
+                part = item.strip().split(" ")[0]
+                image_url = _normalize_image_candidate(base_url, part)
+                if image_url:
+                    return image_url
+
+    return _find_best_img_tag(soup, base_url)
+
+
+def extract_image_url(
+    article_url: str | None, article: Dict | None = None
+) -> str | None:
+    """Fetch article thumbnails with retries, fallbacks, and caching."""
+    article = article or {}
+    existing = article.get("image")
+    if isinstance(existing, str) and existing.strip():
+        return existing.strip()
+
+    normalized_url = normalize_article_url_for_image(article_url)
+    if not normalized_url:
+        return None
+
+    cached = _get_cached_image(normalized_url)
+    if cached is not _CACHE_MISS:
+        _increment_image_stat("cache_hits")
+        return cached
+
+    image_url: str | None = None
+    soup = _fetch_article_page(normalized_url)
+    if soup:
+        image_url = _extract_image_from_soup(soup, normalized_url)
+
+    _set_cached_image(normalized_url, image_url)
+    return image_url
+
+
+def _enrich_article_metadata(article: Dict) -> Dict:
+    if not article.get("published_at"):
+        article["published_at"] = extract_published_at(article.get("url"), article)
+    if not article.get("image"):
+        article["image"] = extract_image_url(article.get("url"), article)
+    return article
+
+
+def populate_article_metadata(articles: List[Dict]) -> None:
+    if not articles:
+        return
+
+    _PAGE_FETCH_CACHE.clear()
+    with ThreadPoolExecutor(max_workers=min(8, len(articles))) as executor:
+        futures = [
+            executor.submit(_enrich_article_metadata, article) for article in articles
+        ]
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception:
+                continue
+    _PAGE_FETCH_CACHE.clear()
+
+
+def _score_value(judgment: Dict[str, Any], key: str) -> float:
+    try:
+        return float(judgment.get(key) or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def article_passes_judge(judgment: Dict[str, Any]) -> bool:
+    """Apply keep rules with a softer bar for Market_Trend content."""
+    relevance = _score_value(judgment, "relevance")
+    technical_depth = _score_value(judgment, "technical_depth")
+    compellingness = _score_value(judgment, "compellingness")
+    category = judgment.get("category") or "Other"
+    keep_flag = bool(judgment.get("keep", False))
+
+    if category == "Market_Trend":
+        if keep_flag and relevance >= 6 and compellingness >= 6:
+            return True
+        if relevance >= 6 and compellingness >= 6 and technical_depth >= 4:
+            return True
+        if keep_flag and relevance >= 5.5 and compellingness >= 5.5:
+            return True
+        return False
+
+    if keep_flag and relevance >= 7 and technical_depth >= 5.5:
+        return True
+    if keep_flag and relevance >= 6.5 and technical_depth >= 6:
+        return True
+    return False
 
 
 def fetch_arxiv_papers() -> List[Dict]:
@@ -181,34 +841,65 @@ class AgentState(TypedDict):
     search_results: List[Dict]
     candidates: List[Dict]
     final_articles: List[Dict]
+    metrics: Dict[str, int]
 
 
 def search_node(state: AgentState) -> AgentState:
     print("🔍 Step 1/3: Tavily + RSS + arXiv...")
     queries = state["queries"]
     results: List[Dict] = []
+    metrics = state.setdefault(
+        "metrics",
+        {
+            "fetched_web_results": 0,
+            "fetched_rss_results": 0,
+            "fetched_arxiv_results": 0,
+            "search_errors": 0,
+            "search_rate_limit_errors": 0,
+            "judge_errors": 0,
+            "judge_rate_limit_errors": 0,
+        },
+    )
 
     for i, q in enumerate(queries, 1):
         print(f"   Searching query {i}/{len(queries)}: {q}")
-        try:
-            resp = tavily_client.search(
-                query=q,
-                search_depth="advanced",
-                max_results=8,
-                include_answer=True,
-                time_range="month",
-            )
-            for res in resp.get("results", []):
-                results.append(
-                    {
-                        "url": res["url"],
-                        "title": res["title"],
-                        "content": res.get("content") or res.get("snippet", ""),
-                        "source": "web",
-                    }
+        for attempt in range(1, 3):
+            try:
+                resp = tavily_client.search(
+                    query=q,
+                    search_depth="advanced",
+                    max_results=_TAVILY_MAX_RESULTS,
+                    include_answer=True,
+                    time_range="month",
                 )
-        except Exception as e:
-            print(f"   Tavily warning for '{q}': {e}")
+                web_results = resp.get("results", [])
+                metrics["fetched_web_results"] += len(web_results)
+                for res in web_results:
+                    published = (
+                        res.get("published_date")
+                        or res.get("published_time")
+                        or res.get("date")
+                    )
+                    results.append(
+                        {
+                            "url": res["url"],
+                            "title": res["title"],
+                            "content": res.get("content") or res.get("snippet", ""),
+                            "source": "web",
+                            "published_at": _parse_datetime_string(published)
+                            if published
+                            else None,
+                            "image": res.get("image") or res.get("thumbnail"),
+                        }
+                    )
+                break
+            except Exception as e:
+                metrics["search_errors"] += 1
+                if _is_rate_limit_error(e):
+                    metrics["search_rate_limit_errors"] += 1
+                print(f"   Tavily warning for '{q}' (attempt {attempt}/2): {e}")
+                if attempt == 1:
+                    time.sleep(1.2)
 
     rss_feeds = [
         "https://rss.arxiv.org/rss/cs.CV",
@@ -223,7 +914,9 @@ def search_node(state: AgentState) -> AgentState:
     for feed_url in rss_feeds:
         try:
             feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:8]:
+            feed_entries = feed.entries[:_RSS_ENTRIES_PER_FEED]
+            metrics["fetched_rss_results"] += len(feed_entries)
+            for entry in feed_entries:
                 results.append(
                     {
                         "url": entry.link,
@@ -232,16 +925,22 @@ def search_node(state: AgentState) -> AgentState:
                             "summary", entry.get("description", "")
                         ),
                         "source": "rss",
+                        "published_at": _parse_feed_entry_date(entry),
+                        "image": _parse_feed_entry_image(entry),
                     }
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            metrics["search_errors"] += 1
+            if _is_rate_limit_error(e):
+                metrics["search_rate_limit_errors"] += 1
 
     print("Fetching recent computer vision papers from arXiv...")
-    results.extend(fetch_arxiv_papers())
+    arxiv_results = fetch_arxiv_papers()
+    metrics["fetched_arxiv_results"] += len(arxiv_results)
+    results.extend(arxiv_results)
 
     results = dedupe_items_by_url(results)
-    state["search_results"] = results[:35]
+    state["search_results"] = results[:_SEARCH_RESULTS_CAP]
     print(f"✅ Search complete — {len(state['search_results'])} candidates (URL-deduped).\n")
     return state
 
@@ -253,6 +952,7 @@ def judge_node(state: AgentState) -> AgentState:
     )
     model = state.get("judge_model") or "grok-4-1-fast-reasoning"
     candidates = []
+    metrics = state.setdefault("metrics", {})
     total = len(state["search_results"])
 
     for i, item in enumerate(state["search_results"], 1):
@@ -283,7 +983,7 @@ def judge_node(state: AgentState) -> AgentState:
             )
             judgment = json.loads(response.choices[0].message.content)
 
-            if judgment.get("keep", False):
+            if article_passes_judge(judgment):
                 item.update(
                     {
                         "score_relevance": judgment.get("relevance", 0),
@@ -298,13 +998,24 @@ def judge_node(state: AgentState) -> AgentState:
                 )
                 candidates.append(item)
                 print(
-                    f"      → KEPT (Rel:{judgment.get('relevance')} "
+                    f"      → KEPT [{judgment.get('category', 'Other')}] "
+                    f"(Rel:{judgment.get('relevance')} "
                     f"Tech:{judgment.get('technical_depth')})"
                 )
             else:
-                print("      → Skipped")
+                skipped_cat = judgment.get("category", "Other")
+                print(
+                    f"      → Skipped ({skipped_cat}, "
+                    f"Rel:{judgment.get('relevance')}, "
+                    f"Tech:{judgment.get('technical_depth')})"
+                )
 
         except Exception as e:
+            metrics["judge_errors"] = metrics.get("judge_errors", 0) + 1
+            if _is_rate_limit_error(e):
+                metrics["judge_rate_limit_errors"] = (
+                    metrics.get("judge_rate_limit_errors", 0) + 1
+                )
             print(f"      → Skipped (error: {type(e).__name__})")
             continue
 
@@ -324,12 +1035,13 @@ def dedup_node(state: AgentState) -> AgentState:
         return state
 
     url_ordered = dedupe_items_by_url(state["candidates"])
+    url_ordered = dedupe_items_by_title(url_ordered)
 
     texts = [f"{a['title']} {a.get('summary', '')[:500]}" for a in url_ordered]
     embeddings = embedder.encode(texts)
     sim_matrix = cosine_similarity(embeddings)
 
-    similarity_threshold = 0.85
+    similarity_threshold = 0.88
     kept: List[Dict] = []
     for i, item in enumerate(url_ordered):
         if all(sim_matrix[i][j] < similarity_threshold for j in range(i)):
@@ -362,6 +1074,7 @@ def run_pipeline(
 ) -> List[Dict]:
     queries = custom_queries if custom_queries else DEFAULT_QUERIES
     judge_model = model or "grok-4-1-fast-reasoning"
+    _reset_image_runtime_stats()
 
     initial_state: AgentState = {
         "queries": queries,
@@ -369,12 +1082,37 @@ def run_pipeline(
         "search_results": [],
         "candidates": [],
         "final_articles": [],
+        "metrics": {
+            "fetched_web_results": 0,
+            "fetched_rss_results": 0,
+            "fetched_arxiv_results": 0,
+            "search_errors": 0,
+            "search_rate_limit_errors": 0,
+            "judge_errors": 0,
+            "judge_rate_limit_errors": 0,
+        },
     }
 
     print("🚀 Starting IVS News Pipeline...\n")
     start_total = time.time()
 
     result = app.invoke(initial_state)
+    populate_article_metadata(result["final_articles"])
+    result["final_articles"].sort(
+        key=lambda art: art.get("published_at") or "",
+        reverse=True,
+    )
+    metrics = result.get("metrics", {})
+    fetched_total = (
+        metrics.get("fetched_web_results", 0)
+        + metrics.get("fetched_rss_results", 0)
+        + metrics.get("fetched_arxiv_results", 0)
+    )
+    successful_images = sum(
+        1 for article in result["final_articles"] if article.get("image")
+    )
+    with _image_stats_lock:
+        image_stats = dict(_image_runtime_stats)
 
     duration = time.time() - start_total
     timestamp = datetime.now().isoformat()
@@ -392,6 +1130,33 @@ def run_pipeline(
     print(
         f"✅ {len(result['final_articles'])} high-signal articles saved to articles.json"
     )
+    print("\n📊 Run summary")
+    print(f"   - Articles fetched (pre-dedup): {fetched_total}")
+    print(f"   - Final articles: {len(result['final_articles'])}")
+    print(f"   - Successful images: {successful_images}/{len(result['final_articles'])}")
+    print(
+        "   - Image extraction: "
+        f"{image_stats.get('http_requests', 0)} HTTP requests, "
+        f"{image_stats.get('cache_hits', 0)} cache hits, "
+        f"{image_stats.get('request_errors', 0)} request errors"
+    )
+    total_rate_limits = (
+        metrics.get("search_rate_limit_errors", 0)
+        + metrics.get("judge_rate_limit_errors", 0)
+        + image_stats.get("rate_limit_errors", 0)
+    )
+    total_errors = (
+        metrics.get("search_errors", 0)
+        + metrics.get("judge_errors", 0)
+        + image_stats.get("request_errors", 0)
+    )
+    if total_rate_limits > 0 or total_errors > 0:
+        print(
+            "   - Issues: "
+            f"{total_rate_limits} rate-limit events, {total_errors} total recoverable errors"
+        )
+    else:
+        print("   - Issues: none detected")
 
     if supabase and result["final_articles"]:
         print("\n💾 Saving to Supabase...")
@@ -413,20 +1178,36 @@ def run_pipeline(
                 "score_compelling": art.get("score_compelling"),
                 "entities": art.get("entities", []),
                 "takeaways": art.get("takeaways", []),
+                "image": art.get("image"),
                 "embedding": embedding,
                 "run_at": timestamp,
             }
 
             try:
-                response = supabase.table("ivs_articles").upsert(
+                supabase.table("ivs_articles").upsert(
                     data, on_conflict="url"
                 ).execute()
-                if response.data:
-                    saved_count += 1
+                # Count successful requests (do not require response.data; empty is OK).
+                saved_count += 1
             except Exception as e:
                 print(f"   Supabase upsert failed for {art['title'][:60]}...: {e}")
 
         print(f"✅ Saved/updated {saved_count} articles in Supabase.\n")
+
+        # Fail the job if we kept articles but wrote nothing (e.g. auth/key failures).
+        # Prevents GitHub Actions from staying green while Supabase receives 0 rows.
+        if saved_count == 0:
+            raise SystemExit(
+                f"ERROR: Pipeline produced {len(result['final_articles'])} article(s) "
+                "but saved 0 to Supabase. Check SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY "
+                "and upsert errors above."
+            )
+
+    elif result["final_articles"] and not supabase:
+        raise SystemExit(
+            "ERROR: Pipeline produced articles but Supabase client is not configured "
+            "(missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY)."
+        )
 
     for i, art in enumerate(result["final_articles"], 1):
         print(f"{i}. [{art.get('category', 'Other')}] {art['title']}")
