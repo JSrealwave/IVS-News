@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, NotRequired, TypedDict
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import urljoin, urlparse
 
 import arxiv
 import feedparser
@@ -23,6 +23,20 @@ from sklearn.metrics.pairwise import cosine_similarity
 from supabase import Client, create_client
 from tavily import TavilyClient
 
+from news_quality import (
+    HIDDEN_SOURCE,
+    UPSERT_MAX_AGE_DAYS,
+    arxiv_abs_url,
+    canonicalize_article_url,
+    canonical_url_key,
+    extract_arxiv_id,
+    is_heading_title,
+    is_hidden_row,
+    is_quality_article_image,
+    published_at_older_than,
+    reject_reason,
+    tavily_time_range,
+)
 from prompts import IVS_JUDGE_PROMPT, SYSTEM_PROMPT
 
 load_dotenv(override=True)
@@ -60,9 +74,6 @@ DEFAULT_QUERIES = [
     "IoT sensor fusion OR physical security convergence OR enterprise application integration video analytics",
 ]
 
-_ARXIV_ID_RE = re.compile(
-    r"arxiv\.org/(?:abs|pdf)/([\w.-]+)(?:\.pdf)?", re.IGNORECASE
-)
 _DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -177,25 +188,7 @@ def _set_cached_image(article_url: str | None, image_url: str | None) -> None:
 _CACHE_MISS = object()
 
 
-def canonical_url_key(url: str | None) -> str:
-    """Stable key for deduplication (handles http/https, trailing slashes, arXiv abs/pdf)."""
-    if not url or not isinstance(url, str):
-        return ""
-    raw = url.strip()
-    m = _ARXIV_ID_RE.search(raw)
-    if m:
-        return f"arxiv:{m.group(1).lower()}"
-
-    try:
-        p = urlparse(raw)
-        netloc = (p.netloc or "").lower()
-        if netloc.startswith("www."):
-            netloc = netloc[4:]
-        path = (p.path or "").rstrip("/") or "/"
-        scheme = "https"
-        return urlunparse((scheme, netloc, path, "", "", "")).lower()
-    except Exception:
-        return raw.lower().rstrip("/")
+# canonical_url_key imported from news_quality (www strip, utm strip, arXiv /abs/).
 
 
 def dedupe_items_by_url(items: List[Dict]) -> List[Dict]:
@@ -477,9 +470,9 @@ def normalize_article_url_for_image(url: str | None) -> str | None:
         return None
 
     url = url.strip()
-    m = _ARXIV_ID_RE.search(url)
-    if m:
-        return f"https://arxiv.org/abs/{m.group(1)}"
+    abs_url = arxiv_abs_url(url)
+    if abs_url:
+        return abs_url
     return url
 
 
@@ -548,20 +541,8 @@ def _normalize_image_candidate(
     if parsed.scheme not in {"http", "https"}:
         return None
 
-    lowered = resolved.lower()
-    if strict_logo_filter and any(
-        token in lowered for token in ["sprite", "favicon", "1x1", "pixel.gif"]
-    ):
+    if not is_quality_article_image(resolved):
         return None
-    if strict_logo_filter and any(
-        token in lowered for token in ["logo", "icon", "avatar"]
-    ):
-        if not any(
-            token in lowered
-            for token in ["og-image", "og_image", "featured", "hero", "thumb", "cover"]
-        ):
-            return None
-
     return resolved
 
 
@@ -616,6 +597,7 @@ def _find_best_img_tag(soup: BeautifulSoup, base_url: str) -> str | None:
 
 
 def _extract_image_from_soup(soup: BeautifulSoup, base_url: str) -> str | None:
+    """og:image, twitter:image, and schema.org article image only. Never icons/logos."""
     selectors = [
         ("meta", {"property": "og:image:secure_url"}, "content"),
         ("meta", {"property": "og:image"}, "content"),
@@ -624,10 +606,6 @@ def _extract_image_from_soup(soup: BeautifulSoup, base_url: str) -> str | None:
         ("meta", {"name": "twitter:image"}, "content"),
         ("meta", {"property": "twitter:image"}, "content"),
         ("meta", {"name": "twitter:image:src"}, "content"),
-        ("meta", {"name": "thumbnail"}, "content"),
-        ("meta", {"itemprop": "image"}, "content"),
-        ("link", {"rel": "image_src"}, "href"),
-        ("link", {"rel": "apple-touch-icon"}, "href"),
     ]
 
     for tag_name, attrs, attr_key in selectors:
@@ -636,38 +614,19 @@ def _extract_image_from_soup(soup: BeautifulSoup, base_url: str) -> str | None:
             image_url = _normalize_image_candidate(
                 base_url,
                 tag[attr_key],
-                strict_logo_filter=False,
+                strict_logo_filter=True,
             )
             if image_url:
                 return image_url
 
-    for tag in soup.find_all(attrs={"itemprop": "image"}):
-        src = tag.get("src") or tag.get("content") or tag.get("href")
-        image_url = _normalize_image_candidate(
-            base_url, src, strict_logo_filter=False
-        )
-        if image_url:
-            return image_url
-
     schema_image = _find_schema_image(soup)
     image_url = _normalize_image_candidate(
-        base_url, schema_image, strict_logo_filter=False
+        base_url, schema_image, strict_logo_filter=True
     )
     if image_url:
         return image_url
 
-    for picture in soup.find_all("picture"):
-        for source in picture.find_all("source"):
-            srcset = source.get("srcset") or source.get("data-srcset")
-            if not srcset:
-                continue
-            for item in srcset.split(","):
-                part = item.strip().split(" ")[0]
-                image_url = _normalize_image_candidate(base_url, part)
-                if image_url:
-                    return image_url
-
-    return _find_best_img_tag(soup, base_url)
+    return None
 
 
 def extract_image_url(
@@ -676,7 +635,7 @@ def extract_image_url(
     """Fetch article thumbnails with retries, fallbacks, and caching."""
     article = article or {}
     existing = article.get("image")
-    if isinstance(existing, str) and existing.strip():
+    if isinstance(existing, str) and is_quality_article_image(existing):
         return existing.strip()
 
     normalized_url = normalize_article_url_for_image(article_url)
@@ -686,22 +645,31 @@ def extract_image_url(
     cached = _get_cached_image(normalized_url)
     if cached is not _CACHE_MISS:
         _increment_image_stat("cache_hits")
-        return cached
+        if cached is None or is_quality_article_image(cached):
+            return cached
+        cached = None
 
     image_url: str | None = None
     soup = _fetch_article_page(normalized_url)
     if soup:
         image_url = _extract_image_from_soup(soup, normalized_url)
+    if image_url and not is_quality_article_image(image_url):
+        image_url = None
 
     _set_cached_image(normalized_url, image_url)
     return image_url
 
 
 def _enrich_article_metadata(article: Dict) -> Dict:
+    canonical = canonicalize_article_url(article.get("url"))
+    if canonical:
+        article["url"] = canonical
     if not article.get("published_at"):
         article["published_at"] = extract_published_at(article.get("url"), article)
-    if not article.get("image"):
+    if not is_quality_article_image(article.get("image")):
         article["image"] = extract_image_url(article.get("url"), article)
+    elif article.get("image") and not is_quality_article_image(article.get("image")):
+        article["image"] = None
     return article
 
 
@@ -806,12 +774,17 @@ def fetch_arxiv_papers() -> List[Dict]:
 
             batch = []
             for paper in client.results(search):
-                url = paper.pdf_url or paper.entry_id
+                short_id = getattr(paper, "get_short_id", lambda: "")() or ""
+                abs_url = (
+                    arxiv_abs_url(paper.entry_id)
+                    or (f"https://arxiv.org/abs/{short_id}" if short_id else None)
+                    or paper.entry_id
+                )
                 batch.append(
                     {
                         "title": paper.title,
                         "content": paper.summary,
-                        "url": url,
+                        "url": abs_url,
                         "source": "arxiv",
                         "published_at": paper.published.isoformat()
                         if paper.published
@@ -833,6 +806,45 @@ def fetch_arxiv_papers() -> List[Dict]:
                 print("Continuing without arXiv (Tavily/RSS only).")
 
     return papers
+
+
+def _enrich_arxiv_result(item: Dict) -> Dict:
+    """Rewrite /html/ or /pdf/ to /abs/ and take title+date from the arXiv API."""
+    url = item.get("url") or ""
+    arxiv_id = extract_arxiv_id(url)
+    if not arxiv_id:
+        return item
+    item["url"] = arxiv_abs_url(url) or item["url"]
+    try:
+        client = arxiv.Client(delay_seconds=1.0, num_retries=2)
+        paper = next(client.results(arxiv.Search(id_list=[arxiv_id])), None)
+        if not paper:
+            return item
+        item["title"] = paper.title
+        if paper.summary:
+            item["content"] = paper.summary
+        if paper.published:
+            item["published_at"] = paper.published.isoformat()
+        item["source"] = item.get("source") or "arxiv"
+    except Exception as exc:
+        print(f"   arXiv enrich skipped for {arxiv_id}: {exc}")
+    return item
+
+
+def _prepare_search_item(item: Dict) -> Dict:
+    canonical = canonicalize_article_url(item.get("url"))
+    if canonical:
+        item["url"] = canonical
+    href = item.get("url") or ""
+    title = item.get("title") or ""
+    if extract_arxiv_id(href) and (
+        is_heading_title(title) or "/html/" in href or "/pdf/" in href
+    ):
+        item = _enrich_arxiv_result(item)
+    image = item.get("image")
+    if image and not is_quality_article_image(image):
+        item["image"] = None
+    return item
 
 
 class AgentState(TypedDict):
@@ -861,6 +873,9 @@ def search_node(state: AgentState) -> AgentState:
         },
     )
 
+    search_time_range = tavily_time_range()
+    print(f"   Tavily time_range={search_time_range!r} (week on Monday, d Tue–Fri)")
+
     for i, q in enumerate(queries, 1):
         print(f"   Searching query {i}/{len(queries)}: {q}")
         for attempt in range(1, 3):
@@ -870,7 +885,7 @@ def search_node(state: AgentState) -> AgentState:
                     search_depth="advanced",
                     max_results=_TAVILY_MAX_RESULTS,
                     include_answer=True,
-                    time_range="month",
+                    time_range=search_time_range,
                 )
                 web_results = resp.get("results", [])
                 metrics["fetched_web_results"] += len(web_results)
@@ -880,16 +895,17 @@ def search_node(state: AgentState) -> AgentState:
                         or res.get("published_time")
                         or res.get("date")
                     )
+                    image = res.get("image") or res.get("thumbnail")
                     results.append(
                         {
-                            "url": res["url"],
+                            "url": canonicalize_article_url(res["url"]) or res["url"],
                             "title": res["title"],
                             "content": res.get("content") or res.get("snippet", ""),
                             "source": "web",
                             "published_at": _parse_datetime_string(published)
                             if published
                             else None,
-                            "image": res.get("image") or res.get("thumbnail"),
+                            "image": image if is_quality_article_image(image) else None,
                         }
                     )
                 break
@@ -917,16 +933,19 @@ def search_node(state: AgentState) -> AgentState:
             feed_entries = feed.entries[:_RSS_ENTRIES_PER_FEED]
             metrics["fetched_rss_results"] += len(feed_entries)
             for entry in feed_entries:
+                rss_image = _parse_feed_entry_image(entry)
                 results.append(
                     {
-                        "url": entry.link,
+                        "url": canonicalize_article_url(entry.link) or entry.link,
                         "title": entry.title,
                         "content": entry.get(
                             "summary", entry.get("description", "")
                         ),
                         "source": "rss",
                         "published_at": _parse_feed_entry_date(entry),
-                        "image": _parse_feed_entry_image(entry),
+                        "image": rss_image
+                        if is_quality_article_image(rss_image)
+                        else None,
                     }
                 )
         except Exception as e:
@@ -939,6 +958,12 @@ def search_node(state: AgentState) -> AgentState:
     metrics["fetched_arxiv_results"] += len(arxiv_results)
     results.extend(arxiv_results)
 
+    results = [_prepare_search_item(item) for item in results]
+    results = [
+        item
+        for item in results
+        if not reject_reason(item.get("title"), item.get("url"))
+    ]
     results = dedupe_items_by_url(results)
     state["search_results"] = results[:_SEARCH_RESULTS_CAP]
     print(f"✅ Search complete — {len(state['search_results'])} candidates (URL-deduped).\n")
@@ -960,6 +985,11 @@ def judge_node(state: AgentState) -> AgentState:
             item["title"][:80] + "..." if len(item["title"]) > 80 else item["title"]
         )
         print(f"   Judging {i}/{total}: {title_short}")
+
+        cheap_reject = reject_reason(item.get("title"), item.get("url"))
+        if cheap_reject:
+            print(f"      → Skipped ({cheap_reject})")
+            continue
 
         snippet = item["content"][:5500]
 
@@ -1098,6 +1128,21 @@ def run_pipeline(
 
     result = app.invoke(initial_state)
     populate_article_metadata(result["final_articles"])
+    kept_dated = []
+    for art in result["final_articles"]:
+        reason = reject_reason(
+            art.get("title"),
+            art.get("url"),
+            art.get("published_at"),
+            require_published_at=True,
+        )
+        if reason:
+            print(f"   Dropping before save ({reason}): {art.get('title', '')[:80]}")
+            continue
+        if not is_quality_article_image(art.get("image")):
+            art["image"] = None
+        kept_dated.append(art)
+    result["final_articles"] = kept_dated
     result["final_articles"].sort(
         key=lambda art: art.get("published_at") or "",
         reverse=True,
@@ -1160,25 +1205,70 @@ def run_pipeline(
 
     if supabase and result["final_articles"]:
         print("\n💾 Saving to Supabase...")
+        existing_by_key: Dict[str, Dict[str, Any]] = {}
+        try:
+            existing_rows = (
+                supabase.table("ivs_articles")
+                .select("id,url,published_at,source")
+                .execute()
+                .data
+                or []
+            )
+            for row in existing_rows:
+                key = canonical_url_key(row.get("url"))
+                if key and key not in existing_by_key:
+                    existing_by_key[key] = row
+        except Exception as exc:
+            print(f"   Warning: could not load existing articles ({exc})")
+
         saved_count = 0
+        skipped_count = 0
+        write_errors = 0
         for art in result["final_articles"]:
+            canonical = canonicalize_article_url(art.get("url")) or art.get("url")
+            art["url"] = canonical
+            if not art.get("published_at"):
+                print(f"   Skip (no published_at): {art.get('title', '')[:60]}")
+                skipped_count += 1
+                continue
+
+            existing = existing_by_key.get(canonical_url_key(canonical))
+            if existing and is_hidden_row(existing):
+                print(f"   Skip (hidden): {art.get('title', '')[:60]}")
+                skipped_count += 1
+                continue
+            if existing and published_at_older_than(
+                existing.get("published_at"), UPSERT_MAX_AGE_DAYS
+            ):
+                print(
+                    f"   Skip (existing published_at older than {UPSERT_MAX_AGE_DAYS}d): "
+                    f"{art.get('title', '')[:60]}"
+                )
+                skipped_count += 1
+                continue
+
             text_for_embedding = f"{art['title']} {art.get('summary', '')}"
             embedding = embedder.encode([text_for_embedding])[0].tolist()
+            source = art.get("source") or "web"
+            if source == HIDDEN_SOURCE:
+                source = "web"
 
             data = {
-                "url": art["url"],
+                "url": existing["url"] if existing else canonical,
                 "title": art["title"],
                 "summary": art.get("summary"),
                 "content_snippet": art.get("content", "")[:2000],
                 "published_at": art.get("published_at"),
-                "source": art.get("source", "web"),
+                "source": source,
                 "category": art.get("category", "Other"),
                 "score_relevance": art.get("score_relevance"),
                 "score_technical": art.get("score_technical"),
                 "score_compelling": art.get("score_compelling"),
                 "entities": art.get("entities", []),
                 "takeaways": art.get("takeaways", []),
-                "image": art.get("image"),
+                "image": art.get("image")
+                if is_quality_article_image(art.get("image"))
+                else None,
                 "embedding": embedding,
                 "run_at": timestamp,
             }
@@ -1187,16 +1277,17 @@ def run_pipeline(
                 supabase.table("ivs_articles").upsert(
                     data, on_conflict="url"
                 ).execute()
-                # Count successful requests (do not require response.data; empty is OK).
                 saved_count += 1
             except Exception as e:
+                write_errors += 1
                 print(f"   Supabase upsert failed for {art['title'][:60]}...: {e}")
 
-        print(f"✅ Saved/updated {saved_count} articles in Supabase.\n")
+        print(
+            f"✅ Saved/updated {saved_count} articles in Supabase "
+            f"({skipped_count} skipped, {write_errors} errors).\n"
+        )
 
-        # Fail the job if we kept articles but wrote nothing (e.g. auth/key failures).
-        # Prevents GitHub Actions from staying green while Supabase receives 0 rows.
-        if saved_count == 0:
+        if saved_count == 0 and write_errors > 0:
             raise SystemExit(
                 f"ERROR: Pipeline produced {len(result['final_articles'])} article(s) "
                 "but saved 0 to Supabase. Check SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY "
